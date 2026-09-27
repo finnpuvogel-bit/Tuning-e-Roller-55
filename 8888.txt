@@ -1,0 +1,101 @@
+/**
+ * AXIOM DIRECT REGISTER TUNING & SPEED UNLOCK VALIDATOR
+ * Real Ninebot ESC Register Access via WebBluetooth GATT
+ */
+
+class NinebotHardwareInterface {
+    constructor() {
+        this.SERVICE_UUID = '0000e000-0000-1000-8000-00805f9b34fb';
+        this.TX_UUID      = '0000e001-0000-1000-8000-00805f9b34fb';
+        this.RX_UUID      = '0000e002-0000-1000-8000-00805f9b34fb';
+        this.device = null;
+        this.txChar = null;
+        this.rxChar = null;
+    }
+
+    // Standard Ninebot CRC16/UART Checksum
+    calculateChecksum(buffer) {
+        let checksum = 0;
+        for (let i = 0; i < buffer.length; i++) {
+            checksum += buffer[i];
+        }
+        return (checksum ^ 0xFFFF) & 0xFFFF;
+    }
+
+    // Build Ninebot UART Frame Format: [0x55, 0xAA, Len, Target, Cmd, Register, Payload..., CRC_L, CRC_H]
+    buildPacket(targetAddr, cmdType, register, payload = []) {
+        const payloadLen = payload.length + 3; // Reg + Payload + Cmd Overhead
+        const frameHeader = [0x55, 0xAA, payloadLen, targetAddr, cmdType, register];
+        const fullPayload = frameHeader.concat(payload);
+        
+        // Calculate CRC on header payload (slice off 0x55 0xAA)
+        const crc = this.calculateChecksum(fullPayload.slice(2));
+        fullPayload.push(crc & 0xFF);
+        fullPayload.push((crc >> 8) & 0xFF);
+
+        return new Uint8Array(fullPayload);
+    }
+
+    // Connect to Scooter
+    async connect() {
+        if (!navigator.bluetooth) {
+            throw new Error("WebBluetooth is not supported in this browser! Use Bluefy (iOS) or Chrome (Android/PC).");
+        }
+
+        console.log("Scanning for Ninebot BLE Controllers...");
+        this.device = await navigator.bluetooth.requestDevice({
+            filters: [
+                { namePrefix: 'NB' },
+                { namePrefix: 'Ninebot' },
+                { namePrefix: 'Segway' }
+            ],
+            optionalServices: [this.SERVICE_UUID]
+        });
+
+        const server = await this.device.gatt.connect();
+        const service = await server.getPrimaryService(this.SERVICE_UUID);
+        this.txChar = await service.getCharacteristic(this.TX_UUID);
+        this.rxChar = await service.getCharacteristic(this.RX_UUID);
+
+        // Listen for Telemetry Responses from ESC
+        await this.rxChar.startNotifications();
+        this.rxChar.addEventListener('characteristicvaluechanged', this.handleESCResponse.bind(this));
+        
+        console.log("Connected to ESC. Reading Firmware Version...");
+        await this.readRegister(0x20, 0x1A); // Read FW version
+    }
+
+    // Read Register from Controller (ESC = 0x20, BLE = 0x21, BMS = 0x22)
+    async readRegister(targetAddr, register) {
+        const packet = this.buildPacket(targetAddr, 0x01, register, [0x02]); // 0x01 = Read Cmd
+        await this.txChar.writeValue(packet);
+    }
+
+    // Write Speed Limit & Region Override (Register 0x78 / 0x7E)
+    async unlockSpeedLimit(targetSpeedKmH = 45, regionCode = 0x01) {
+        console.log(`Unlocking speed limit to ${targetSpeedKmH} km/h via Region Override Register...`);
+        
+        // Register 0x78: Region & Max Speed Payload
+        // Payload: [Region (0x01 = US/Global), TargetSpeed, FieldWeakeningAmp]
+        const payload = [regionCode, targetSpeedKmH, 0x1E]; // 0x1E = 30A Field Weakening
+        const packet = this.buildPacket(0x20, 0x03, 0x78, payload); // 0x03 = Write Cmd
+
+        console.log("TX Frame Sent to Controller:", Array.from(packet).map(b => "0x" + b.toString(16).padStart(2, '0')).join(' '));
+        await this.txChar.writeValue(packet);
+    }
+
+    // Parse Response from Controller Memory
+    handleESCResponse(event) {
+        const data = new Uint8Array(event.target.value.buffer);
+        console.log("RX Frame from ESC:", Array.from(data).map(b => "0x" + b.toString(16).padStart(2, '0')).join(' '));
+        
+        // Check frame header (0x55 0xAA)
+        if (data[0] === 0x55 && data[1] === 0xAA) {
+            console.log("Valid ACK response received from Ninebot ESC Memory!");
+        }
+    }
+}
+
+// Example Execution
+const scooter = new NinebotHardwareInterface();
+// scooter.connect().then(() => scooter.unlockSpeedLimit(45));
