@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>X3 - Custom Firmware Builder</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    :root {
+      --bg: #0c0c14;
+      --card-bg: #141420;
+      --border: #222234;
+      --text: #ffffff;
+      --text-muted: #8e8e9f;
+      --accent: #6c5ce7;
+      --accent-glow: rgba(108, 92, 231, 0.4);
+      --danger: #ff5252;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      padding: 15px;
+      font-size: 14px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding-bottom: 80px;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+    }
+
+    .logo {
+      font-weight: 800;
+      font-size: 22px;
+      letter-spacing: -1px;
+    }
+
+    .lang-switch {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: flex;
+      padding: 2px;
+    }
+
+    .lang-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .lang-btn.active {
+      background: var(--border);
+      color: var(--text);
+    }
+
+    /* Section Headers & Selector Badges */
+    .step-header {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .selector-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .select-btn {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 10px 4px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+    }
+
+    .select-btn.active {
+      background: #1e1e30;
+      border-color: var(--accent);
+      color: var(--text);
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    /* Cards & Accordions */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 14px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .card-content {
+      padding: 0 16px 16px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card-content.hidden {
+      display: none;
+    }
+
+    /* Form Controls */
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .label-text {
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .label-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .value-display {
+      font-weight: 700;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    /* Range Sliders */
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      background: #252538;
+      height: 4px;
+      border-radius: 2px;
+      outline: none;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #ffffff;
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(0,0,0,0.5);
+    }
+
+    /* Toggle Switches */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #252538;
+      transition: .3s;
+      border-radius: 24px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px; width: 18px;
+      left: 3px; bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: var(--accent);
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(20px);
+    }
+
+    /* Inputs */
+    input[type=text] {
+      background: #0f0f18;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px;
+      border-radius: 8px;
+      width: 100%;
+      font-size: 13px;
+      outline: none;
+    }
+
+    /* Presets Buttons */
+    .presets-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .btn-preset {
+      background: #181826;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-preset.unsafe {
+      color: var(--danger);
+    }
+
+    /* D-Pad Controller UI */
+    .dpad-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0;
+    }
+
+    .dpad-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 48px);
+      grid-template-rows: repeat(3, 48px);
+      gap: 6px;
+    }
+
+    .dpad-btn {
+      background: #1a1a2b;
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 18px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .dpad-btn:active {
+      background: var(--accent);
+    }
+
+    .dpad-btn.center {
+      grid-column: 2;
+      grid-row: 2;
+      font-size: 11px;
+      color: var(--text-muted);
+      cursor: default;
+    }
+
+    .code-display {
+      background: #0f0f18;
+      border: 1px dashed var(--border);
+      padding: 10px;
+      border-radius: 8px;
+      width: 100%;
+      text-align: center;
+      letter-spacing: 4px;
+      font-size: 16px;
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Action Footer Button */
+    .btn-build {
+      position: fixed;
+      bottom: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 30px);
+      max-width: 450px;
+      background: linear-gradient(135deg, #6c5ce7, #574b90);
+      color: white;
+      border: none;
+      padding: 16px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(108, 92, 231, 0.5);
+      z-index: 100;
+      text-align: center;
+    }
+
+    .warning-text {
+      color: var(--danger);
+      font-size: 11px;
+      font-weight: bold;
+    }
+
+    .sub-section-title {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="logo">X3</div>
+      <div class="lang-switch">
+        <button class="lang-btn" onclick="setLang('en')">EN</button>
+        <button class="lang-btn active" onclick="setLang('de')">DE</button>
+      </div>
+    </header>
+
+    <!-- 01 SCOOTER MODEL -->
+    <div>
+      <div class="step-header">01 MODELL</div>
+      <div class="selector-grid">
+        <button class="select-btn" onclick="setModel('zt3')">ZT3 Pro</button>
+        <button class="select-btn active" onclick="setModel('g3')">Max G3</button>
+        <button class="select-btn" onclick="setModel('f3')">F3 / F3 Pro</button>
+        <button class="select-btn" onclick="setModel('gt3d')">GT3D</button>
+      </div>
+    </div>
+
+    <!-- 02 TARGET MODULE -->
+    <div>
+      <div class="step-header">02 ZIEL</div>
+      <div class="selector-grid">
+        <button class="select-btn active" id="target-vcu" onclick="setTarget('vcu')">VCU</button>
+        <button class="select-btn" id="target-mcu" onclick="setTarget('mcu')">MCU</button>
+        <button class="select-btn" id="target-ble" onclick="setTarget('ble')">BLE</button>
+        <button class="select-btn" id="target-bms" onclick="setTarget('bms')">BMS</button>
+      </div>
+    </div>
+
+    <!-- 03 SETTINGS PANEL -->
+    <div>
+      <div class="step-header">03 EINSTELLUNGEN</div>
+      
+      <!-- Stock Reset Box -->
+      <div class="card" style="margin-bottom: 12px; padding: 14px;">
+        <div style="font-weight: 600; margin-bottom: 4px;">Stock-Firmware</div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 10px;">Unveränderte Werks-Firmware für das gewählte Ziel herunterladen.</div>
+        <button class="btn-preset" style="width: 100%;" onclick="downloadStock()">Auf Stock zurück</button>
+      </div>
+
+      <!-- DYNAMIC CONTENT AREA -->
+      <div id="dynamic-settings"></div>
+
+    </div>
+  </div>
+
+  <!-- Generate Button -->
+  <button class="btn-build" onclick="buildFirmware()">Firmware erstellen</button>
+
+  <script>
+    let currentModel = 'g3';
+    let currentTarget = 'vcu';
+    let currentLang = 'de';
+
+    // State Variables
+    let unlockCode = ['←', '→', '←', '→'];
+    let vcuState = {
+      stdEco: 15, stdDrive: 20, stdSport: 22,
+      tunEco: 22, tunDrive: 40, tunSport: 100,
+      holdActive: false, holdTimer: 3,
+      boostTimer: 2.5, boostCooldown: 30,
+      cruiseTuning: true, setRange: false, range100: 60,
+      spoofVersion: '1.6.2',
+      polizeimode: true, tuningAlways: false, panicBtn: false,
+      showBatteryStand: false, legacyFw: false
+    };
+
+    let mcuState = {
+      fwActive: true, fwStrength: 0, fwStartSpeed: 50, fwHardCap: 80, fwRamp: 5, fwSockel: 0,
+      lowBatEarly: true, lowBatVolt: 47, lowBatStartSpeed: 40,
+      idFW: 85, iqFW: 95,
+      overrideDriveCurrent: false, driveCurrent: 100,
+      overridePhaseCurrent: false, phaseCurrent: 140,
+      overrideTorque: false, torque: 100,
+      standGas: false, overrideThrottle: false, throttleCurve: 100,
+      overrideWheel: false, wheelSize: 11,
+      overridePWM: false, pwmFreq: 16.00
+    };
+
+    function setLang(lang) {
+      currentLang = lang;
+      document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+      renderSettings();
+    }
+
+    function setModel(model) {
+      currentModel = model;
+      document.querySelectorAll('.selector-grid')[0].querySelectorAll('.select-btn').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      // Adjust spoof default depending on model
+      if (model === 'g3') vcuState.spoofVersion = '1.6.2';
+      else if (model === 'zt3') vcuState.spoofVersion = '6.5.7';
+
+      renderSettings();
+    }
+
+    function setTarget(target) {
+      currentTarget = target;
+      document.querySelectorAll('.selector-grid')[1].querySelectorAll('.select-btn').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+      renderSettings();
+    }
+
+    function addDpad(dir) {
+      if (unlockCode.length < 10) {
+        unlockCode.push(dir);
+        renderSettings();
+      }
+    }
+
+    function clearDpad() {
+      unlockCode = [];
+      renderSettings();
+    }
+
+    function popDpad() {
+      unlockCode.pop();
+      renderSettings();
+    }
+
+    function toggleCard(id) {
+      const content = document.getElementById(id);
+      if (content) content.classList.toggle('hidden');
+    }
+
+    function renderSettings() {
+      const container = document.getElementById('dynamic-settings');
+      container.innerHTML = '';
+
+      if (currentTarget === 'vcu') {
+        if (currentModel === 'g3') {
+          renderG3VCU(container);
+        } else {
+          renderGenericVCU(container);
+        }
+      } else if (currentTarget === 'mcu') {
+        renderMCU(container);
+      } else {
+        container.innerHTML = `<div class="card" style="padding: 20px; text-align: center; color: var(--text-muted);">Keine Konfigurationsoptionen für ${currentTarget.toUpperCase()} verfügbar.</div>`;
+      }
+    }
+
+    // G3 Specific VCU Layout
+    function renderG3VCU(container) {
+      container.innerHTML = `
+        <!-- Geschwindigkeitsgrenzen -->
+        <div class="card">
+          <div class="card-header" onclick="toggleCard('c-speed')">
+            <span>Geschwindigkeitsgrenzen</span>
+            <span>▲</span>
+          </div>
+          <div class="card-content" id="c-speed">
+            <div class="sub-section-title">STANDARD-PROFIL</div>
+            <div class="field-group">
+              <div class="field-row"><span class="label-text">Eco</span><span class="value-display">${vcuState.stdEco} km/h</span></div>
+              <input type="range" min="5" max="30" value="${vcuState.stdEco}" oninput="vcuState.stdEco=this.value; renderSettings()">
+            </div>
+            <div class="field-group">
+              <div class="field-row"><span class="label-text">Drive</span><span class="value-display">${vcuState.stdDrive} km/h</span></div>
+              <input type="range" min="5" max="40" value="${vcuState.stdDrive}" oninput="vcuState.stdDrive=this.value; renderSettings()">
+            </div>
+            <div class="field-group">
+              <div class="field-row"><span class="label-text">Sport</span><span class="value-display">${vcuState.stdSport} km/h</span></div>
+              <input type="range" min="5" max="50" value="${vcuState.stdSport}" oninput="vcuState.stdSport=this.value; renderSettings()">
+            </div>
+
+            <div class="sub-section-title" style="margin-top: 12px;">TUNING-PROFIL</div>
+            <div class="field-group">
+              <div class="field-row"><span class="label-text">Eco</span><span class="value-display">${vcuState.tunEco} km/h</span></div>
+              <input type="range" min="5" max="40" value="${vcuState.tunEco}" oninput="vcuState.tunEco=this.value; renderSettings()">
+            </div>
+            <div class="field-group">
+              <div class="field-row"><span class="label-text">Drive</span><span class="value-display">${vcuState.tunDrive} km/h</span></div>
+              <input type="range" min="5" max="60" value="${vcuState.tunDrive}" oninput="vcuState.tunDrive=this.value; renderSettings()">
+            </div>
+            <div class="field-group">
+              <div class="field-row"><span class="label-text">Sport</span><span class="value-display">${vcuState.tunSport} km/h</span></div>
+              <input type="range" min="5" max="100" value="${vcuState.tunSport}" oninput="vcuState.tunSport=this.value; renderSettings()">
+            </div>
+          </div>
+        </div>
+
+        <!-- Profilwechsel D-Pad -->
+        <div class="card" style="margin-top: 12px;">
+          <div class="card-header" onclick="toggleCard('c-dpad')">
+            <span>Profilwechsel</span>
+            <span>▲</span>
+          </div>
+          <div class="card-content" id="c-dpad">
+            <div class="sub-section-title">UNLOCK-CODE</div>
+            <div class="dpad-container">
+              <div class="dpad-grid">
+                <div></div>
+                <div class="dpad-btn" onclick="addDpad('↑')">↑</div>
+                <div></div>
+                <div class="dpad-btn" onclick="addDpad('←')">←</div>
+                <div class="dpad-btn center">${unlockCode.length}/10</div>
+                <div class="dpad-btn" onclick="addDpad('→')">→</div>
+                <div></div>
+                <div class="dpad-btn" onclick="addDpad('↓')">↓</div>
+                <div></div>
+              </div>
+              <div class="code-display">${unlockCode.join(' ') || '<span style="color:var(--text-muted)">Code eingeben</span>'}</div>
+              <div style="display:flex; gap:10px; width:100%;">
+                <button class="btn-preset" style="flex:1;" onclick="popDpad()">Zurück</button>
+                <button class="btn-preset" style="flex:1;" onclick="clearDpad()">Leeren</button>
+              </div>
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">
+              ↑ Modus &nbsp;&nbsp;&nbsp;&nbsp; ↓ Power<br>
+              ← Blinker links &nbsp;&nbsp;&nbsp;&nbsp; → Blinker rechts<br>
+              Pfeile in der Reihenfolge antippen, in der du die Tasten am Roller drückst, maximal 10.
+            </div>
+          </div>
+        </div>
+
+        <!-- Hold-Modus -->
+        <div class="card" style="margin-top: 12px;">
+          <div class="card-header" onclick="toggleCard('c-hold')">
+            <span>Hold-Modus</span>
+            <span>▲</span>
+          </div>
+          <div class="card-content" id="c-hold">
+            <div class="field-row">
+              <span class="label-text">Hold-Modus aktivieren</span>
+              <label class="switch">
+                <input type="checkbox" ${vcuState.holdActive ? 'checked' : ''} onchange="vcuState.holdActive=this.checked">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="field-group">
+              <div class="field-row"><span class="label-text">Hold activate mode timer</span><span class="value-display">${vcuState.holdTimer} s</span></div>
+              <input type="range" min="1" max="10" step="0.5" value="${vcuState.holdTimer}" oninput="vcuState.holdTimer=this.value; renderSettings()">
+            </div>
+          </div>
+        </div>
+
+        <!-- Boost-Modus -->
+        <div class="card" style="margin-top: 12px;">
+          <div class="card-header" onclick="toggleCard('c-boost')">
+            <span>Boost-Modus</span>
+            <span>▲</span>
+          </div>
+          <div class="card-content" id="c-boost">
+            <div class="field-group">
+              <div class="field-row"><span class="label-text">Boost activate timer</span><span class="value-display">${vcuState.boostTimer} s</span></div>
+              <input type="range" min="1" max="10" step="0.5" value="${vcuState.boostTimer}" oninput="vcuState.boostTimer=this.value; renderSettings()">
+            </div>
+            <div class="field-group">
+              <div class="field-row"><span class="label-text">Boost cooldown</span><span class="value-display">${vcuState.boostCooldown} s</span></div>
+              <input type="range" min="5" max="60" value="${vcuState.boostCooldown}" oninput="vcuState.boostCooldown=this.value; renderSettings()">
+            </div>
+          </div>
+        </div>
+
+        <!-- Tempomat -->
+        <div class="card" style="margin-top: 12px;">
+          <div class="card-header" onclick="toggleCard('c-cruise')">
+            <span>Tempomat</span>
+            <span>▲</span>
+          </div>
+          <div class="card-content" id="c-cruise">
+            <div class="field-row">
+              <div>
+                <div class="label-text">Tempomat im Tuning-Profil</div>
+                <div class="label-sub">Im Standard-Profil aus, im Tuning-Profil an.</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" ${vcuState.cruiseTuning ? 'checked' : ''} onchange="vcuState.cruiseTuning=this.checked">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reichweite -->
+        <div class="card" style="margin-top: 12px;">
+          <div class="card-header" onclick="toggleCard('c-range')">
+            <span>Reichweite</span>
+            <span>▲</span>
+          </div>
+          <div class="card-content" id="c-range">
+            <div class="field-row">
+              <span class="label-text">Reichweite setzen</span>
+              <label class="switch">
+                <input type="checkbox" ${vcuState.setRange ? 'checked' : ''} onchange="vcuState.setRange=this.checked; renderSettings()">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="field-group" style="opacity: ${vcuState.setRange ? 1 : 0.4}">
+              <div class="field-row"><span class="label-text">Reichweite bei 100 %</span><span class="value-display">${vcuState.range100} km</span></div>
+              <input type="range" min="20" max="120" value="${vcuState.range100}" ${vcuState.setRange ? '' : 'disabled'} oninput="vcuState.range100=this.value; renderSettings()">
+            </div>
+          </div>
+        </div>
+
+        <!-- Firmware Version Spoof -->
+        <div class="card" style="margin-top: 12px;">
+          <div class="card-header" onclick="toggleCard('c-spoof')">
+            <span>Firmware Version Spoof</span>
+            <span>▲</span>
+          </div>
+          <div class="card-content" id="c-spoof">
+            <div class="sub-section-title">FIRMWARE-VERSION</div>
+            <div style="display:flex; gap:10px; align-items:center;">
+              <input type="text" value="${vcuState.spoofVersion}" oninput="vcuState.spoofVersion=this.value">
+              <span style="font-size:12px; color:var(--text-muted)">Standard</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Generic VCU Layout (ZT3 / F3)
+    function renderGenericVCU(container) {
+      container.innerHTML = `
+        <div class="card">
+          <div class="card-header" onclick="toggleCard('c-speed-gen')">
+            <span>Geschwindigkeitsgrenzen</span>
+            <span>▲</span>
+          </div>
+          <div class="card-content" id="c-speed-gen">
+            <div class="sub-section-title">TUNING-PROFIL</div>
+            <div class="field-group">
+              <div class="field-row"><span class="label-text">Eco</span><span class="value-display">${vcuState.tunEco} km/h</span></div>
+              <input type="range" min="5" max="40" value="${vcuState.tunEco}" oninput="vcuState.tunEco=this.value; renderSettings()">
+            </div>
+            <div class="field-group">
+              <div class="field-row"><span class="label-text">Drive</span><span class="value-display">${vcuState.tunDrive} km/h</span></div>
+              <input type="range" min="5" max="60" value="${vcuState.tunDrive}" oninput="vcuState.tunDrive=this.value; renderSettings()">
+            </div>
+            <div class="field-group">
+              <div class="field-row"><span class="label-text">Sport</span><span class="value-display">${vcuState.tunSport} km/h</span></div>
+              <input type="range" min="5" max="100" value="${vcuState.tunSport}" oninput="vcuState.tunSport=this.value; renderSettings()">
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 12px;">
+          <div class="card-header" onclick="toggleCard('c-modus')">
+            <span>Modus</span>
+            <span>▲</span>
+          </div>
+          <div class="card-content" id="c-modus">
+            <div class="field-row">
+              <span class="label-text">Polizeimodus</span>
+              <label class="switch">
+                <input type="checkbox" ${vcuState.polizeimode ? 'checked' : ''} onchange="vcuState.polizeimode=this.checked">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="field-row">
+              <span class="label-text">Tuning immer aktiv</span>
+              <label class="switch">
+                <input type="checkbox" ${vcuState.tuningAlways ? 'checked' : ''} onchange="vcuState.tuningAlways=this.checked">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="field-row">
+              <div>
+                <div class="label-text">Panikknopf</div>
+                <div class="warning-text">NO BRICK BUT NOT TESTED FULLY!</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" ${vcuState.panicBtn ? 'checked' : ''} onchange="vcuState.panicBtn=this.checked">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 12px;">
+          <div class="card-header" onclick="toggleCard('c-display')">
+            <span>Anzeige</span>
+            <span>▲</span>
+          </div>
+          <div class="card-content" id="c-display">
+            <div class="field-row">
+              <div>
+                <div class="label-text">Akku im Stand anzeigen</div>
+                <div class="label-sub">Zeigt den Akku auf dem Display, solange der Roller steht.</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" ${vcuState.showBatteryStand ? 'checked' : ''} onchange="vcuState.showBatteryStand=this.checked">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 12px;">
+          <div class="card-header" onclick="toggleCard('c-spoof-gen')">
+            <span>Firmware Version Spoof</span>
+            <span>▲</span>
+          </div>
+          <div class="card-content" id="c-spoof-gen">
+            <div class="sub-section-title">FIRMWARE-VERSION</div>
+            <div style="display:flex; gap:10px; align-items:center;">
+              <input type="text" value="${vcuState.spoofVersion}" oninput="vcuState.spoofVersion=this.value">
+              <span style="font-size:12px; color:var(--text-muted)">Standard</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // MCU Layout
+    function renderMCU(container) {
+      container.innerHTML = `
+        <!-- Presets -->
+        <div class="card">
+          <div class="card-header" onclick="toggleCard('c-presets')">
+            <span>Presets</span>
+            <span>▲</span>
+          </div>
+          <div class="card-content" id="c-presets">
+            <div class="presets-grid">
+              <button class="btn-preset" onclick="applyMcuPreset('stock')">Stock</button>
+              <button class="btn-preset" onclick="applyMcuPreset('chill')">Chill</button>
+              <button class="btn-preset" onclick="applyMcuPreset('fast')">Fast</button>
+              <button class="btn-preset unsafe" onclick="applyMcuPreset('unsafe')">Unsafe</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Feldschwächung -->
+        <div class="card" style="margin-top: 12px;">
+          <div class="card-header" onclick="toggleCard('c-fw')">
+            <span>Feldschwächung</span>
+            <span>▲</span>
+          </div>
+          <div class="card-content" id="c-fw">
+            <div class="field-row">
+              <span class="label-text">Aktiv</span>
+              <label class="switch">
+                <input type="checkbox" ${mcuState.fwActive ? 'checked' : ''} onchange="mcuState.fwActive=this.checked; renderSettings()">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="field-group">
+              <div class="field-row"><span class="label-text">Stärke</span><span class="value-display">${mcuState.fwStrength} A</span></div>
+              <input type="range" min="0" max="40" value="${mcuState.fwStrength}" oninput="mcuState.fwStrength=this.value; renderSettings()">
+            </div>
+
+            <div class="field-group">
+              <div class="field-row"><span class="label-text">Einsetzgeschwindigkeit</span><span class="value-display">${mcuState.fwStartSpeed} km/h</span></div>
+              <input type="range" min="10" max="70" value="${mcuState.fwStartSpeed}" oninput="mcuState.fwStartSpeed=this.value; renderSettings()">
+            </div>
+
+            <div class="field-group">
+              <div class="field-row"><span class="label-text">Hard-Cap</span><span class="value-display">${mcuState.fwHardCap} A</span></div>
+              <input type="range" min="20" max="120" value="${mcuState.fwHardCap}" oninput="mcuState.fwHardCap=this.value; renderSettings()">
+            </div>
+
+            <div class="sub-section-title" style="margin-top: 10px;">NIEDRIGER AKKU</div>
+
+            <div class="field-row">
+              <span class="label-text">Bei niedrigem Akku früher einsetzen</span>
+              <label class="switch">
+                <input type="checkbox" ${mcuState.lowBatEarly ? 'checked' : ''} onchange="mcuState.lowBatEarly=this.checked">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="field-group">
+              <div class="field-row"><span class="label-text">Schwelle</span><span class="value-display">${mcuState.lowBatVolt} V</span></div>
+              <input type="range" min="40" max="52" value="${mcuState.lowBatVolt}" oninput="mcuState.lowBatVolt=this.value; renderSettings()">
+            </div>
+          </div>
+        </div>
+
+        <!-- Stromlimits -->
+        <div class="card" style="margin-top: 12px;">
+          <div class="card-header" onclick="toggleCard('c-currents')">
+            <span>Stromlimits</span>
+            <span>▲</span>
+          </div>
+          <div class="card-content" id="c-currents">
+            <div class="field-group">
+              <div class="field-row"><span class="label-text">idFW Limit</span><span class="value-display">${mcuState.idFW} A</span></div>
+              <input type="range" min="20" max="120" value="${mcuState.idFW}" oninput="mcuState.idFW=this.value; renderSettings()">
+            </div>
+            <div class="field-group">
+              <div class="field-row"><span class="label-text">iqFW Limit</span><span class="value-display">${mcuState.iqFW} A</span></div>
+              <input type="range" min="20" max="140" value="${mcuState.iqFW}" oninput="mcuState.iqFW=this.value; renderSettings()">
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function applyMcuPreset(type) {
+      if (type === 'stock') {
+        mcuState.fwStrength = 0;
+        mcuState.idFW = 60;
+        mcuState.iqFW = 65;
+      } else if (type === 'chill') {
+        mcuState.fwStrength = 10;
+        mcuState.idFW = 75;
+        mcuState.iqFW = 80;
+      } else if (type === 'fast') {
+        mcuState.fwStrength = 25;
+        mcuState.idFW = 90;
+        mcuState.iqFW = 100;
+      } else if (type === 'unsafe') {
+        mcuState.fwStrength = 35;
+        mcuState.idFW = 110;
+        mcuState.iqFW = 130;
+      }
+      renderSettings();
+    }
+
+    function downloadStock() {
+      const fileName = `${currentModel}_${currentTarget}_STOCK.bin`;
+      const blob = new Blob([`STOCK_BINARY_DATA_${currentModel}_${currentTarget}`], {type: 'application/octet-stream'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = fileName;
+      a.click();
+    }
+
+    function buildFirmware() {
+      const zip = new JSZip();
+      
+      // Build Config payload JSON
+      const configData = {
+        model: currentModel,
+        target: currentTarget,
+        vcu: vcuState,
+        mcu: mcuState,
+        unlockCode: unlockCode
+      };
+
+      // Add config JSON and binary mockup to zip
+      zip.file("firmware.json", JSON.stringify(configData, null, 2));
+      zip.file(`${currentModel}_${currentTarget}_custom.bin`, `BINARY_PAYLOAD_${Date.now()}`);
+
+      zip.generateAsync({type: "blob"}).then(function(content) {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(content);
+        a.download = `X3_CFW_${currentModel.toUpperCase()}_${currentTarget.toUpperCase()}.zip`;
+        a.click();
+      });
+    }
+
+    // Initial Render
+    renderSettings();
+  </script>
+</body>
+</html>
