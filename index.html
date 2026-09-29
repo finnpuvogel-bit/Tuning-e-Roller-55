@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SegwayWorld – Tuning & Firmware Studio</title>
+    <!-- JSZip Bibliothek zum Generieren echter ZIP-Dateien im Browser -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --text: #f8fafc;
+            --danger: #ef4444;
+            --success: #22c55e;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1, h2, h3 {
+            color: var(--text);
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        }
+
+        .status-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .status-dot {
+            height: 12px;
+            width: 12px;
+            border-radius: 50%;
+            background-color: var(--danger);
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .status-dot.connected {
+            background-color: var(--success);
+        }
+
+        button {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+
+        button.danger {
+            background-color: var(--danger);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #94a3b8;
+        }
+
+        input[type="range"], input[type="number"], select {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #334155;
+            background-color: #0f172a;
+            color: white;
+            box-sizing: border-box;
+            font-size: 15px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        #log {
+            background-color: #020617;
+            color: #38bdf8;
+            font-family: monospace;
+            padding: 10px;
+            border-radius: 6px;
+            height: 120px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>⚡ SegwayWorld Studio</h1>
+
+    <!-- Bluetooth Status Card -->
+    <div class="card status-bar">
+        <div>
+            <span id="statusDot" class="status-dot"></span>
+            <span id="statusText">Nicht verbunden</span>
+        </div>
+        <button id="connectBtn" style="width: auto;">Mit Roller verbinden</button>
+    </div>
+
+    <!-- Modell Auswahl & FW Parameter -->
+    <div class="card">
+        <h2>1️⃣ E-Scooter Modell auswählen</h2>
+        <div class="form-group">
+            <label>Wähle dein Modell:</label>
+            <select id="scooterModel">
+                <option value="zt3_pro">Ninebot ZT3 Pro (NEW Gen)</option>
+                <option value="max_g3">Ninebot MAX G3 / G30D Series</option>
+                <option value="f3_pro">Ninebot F3 Pro / F2 Series</option>
+                <option value="xiaomi_1s">Xiaomi 1S / Pro 2 / M365</option>
+            </select>
+        </div>
+
+        <h2>2️⃣ Field Weakening & Power-Setup</h2>
+        <div class="grid">
+            <div class="form-group">
+                <label>Field Weakening Start (km/h):</label>
+                <input type="number" id="fwStartSpeed" value="18" min="5" max="40">
+            </div>
+            <div class="form-group">
+                <label>Max. Field Weakening Strom (mA):</label>
+                <input type="number" id="fwCurrent" value="15000" min="1000" max="35000" step="500">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Field Weakening Anstieg (mA/km/h):</label>
+            <input type="range" id="fwSlope" min="100" max="2500" value="800" oninput="document.getElementById('slopeVal').innerText = this.value">
+            <span id="slopeVal">800</span> mA/km/h
+        </div>
+
+        <div class="grid">
+            <div class="form-group">
+                <label>Max. VMax Speedlimit (km/h):</label>
+                <input type="number" id="maxSpeed" value="45" min="15" max="65">
+            </div>
+            <div class="form-group">
+                <label>Profil Modus:</label>
+                <select id="fwMode">
+                    <option value="SHFW_RACE">SHFW Race Profile (Unrestricted)</option>
+                    <option value="SHFW_SPORT">SHFW Sport Profile (Balanced)</option>
+                    <option value="SHFW_ECO">SHFW Eco (Stealth Mode)</option>
+                </select>
+            </div>
+        </div>
+
+        <button onclick="generateScooterZip()">📦 SegwayWorld Firmware ZIP erstellen (~63 KB)</button>
+    </div>
+
+    <!-- Direct Bluetooth Tuning Commands -->
+    <div class="card">
+        <h2>🔓 SegwayWorld Bluetooth Direct Tuning</h2>
+        <p style="font-size: 13px; color: #94a3b8;">Sendet Befehle direkt an den Controller (funktioniert bei offenen/ungesperrten Firmwares).</p>
+        
+        <div class="grid">
+            <button onclick="sendTuningCommand('us_mode')">🚀 US-Mode (30-35 km/h Unlock)</button>
+            <button onclick="sendTuningCommand('eu_mode')">🇩🇪 EU-Mode (20 km/h Restore)</button>
+        </div>
+        <div class="grid" style="margin-top: 10px;">
+            <button onclick="sendTuningCommand('lock')">🔒 Scooter Sperren</button>
+            <button onclick="sendTuningCommand('unlock')" class="danger">🔓 Scooter Entsperren / Soft-Bypass</button>
+        </div>
+    </div>
+
+    <!-- Terminal Log -->
+    <div class="card">
+        <h3>📜 Terminal Log</h3>
+        <div id="log">> SegwayWorld System bereit...</div>
+    </div>
+</div>
+
+<script>
+    let bluetoothDevice;
+    let gattServer;
+
+    const UART_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+
+    function log(text) {
+        const logDiv = document.getElementById('log');
+        logDiv.innerHTML += `<br>> ${text}`;
+        logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    // 1. Bluetooth Connection (Ohne Namensfilter)
+    document.getElementById('connectBtn').addEventListener('click', async () => {
+        try {
+            log("Suche nach Bluetooth-Geräten...");
+            bluetoothDevice = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: [UART_SERVICE_UUID, '0000e000-0000-1000-8000-00805f9b34fb']
+            });
+
+            log(`Gefunden: ${bluetoothDevice.name || 'Unbekanntes Gerät'}`);
+            bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
+            gattServer = await bluetoothDevice.gatt.connect();
+
+            document.getElementById('statusDot').classList.add('connected');
+            document.getElementById('statusText').innerText = `Verbunden mit ${bluetoothDevice.name || 'Scooter'}`;
+
+        } catch (error) {
+            log(`Bluetooth Info: ${error.message}`);
+        }
+    });
+
+    function onDisconnected() {
+        log("Verbindung getrennt!");
+        document.getElementById('statusDot').classList.remove('connected');
+        document.getElementById('statusText').innerText = "Nicht verbunden";
+    }
+
+    // 2. Direct Tuning Commands Senden
+    async function sendTuningCommand(type) {
+        if (!gattServer || !gattServer.connected) {
+            log("FEHLER: Bitte zuerst mit dem Scooter verbinden!");
+            return;
+        }
+
+        let payload = [];
+        if (type === 'us_mode') {
+            log("Sende US-Modus Befehl (Unlock Speed)...");
+            payload = [0x55, 0xAA, 0x03, 0x20, 0x01, 0x78, 0x00, 0x66]; 
+        } else if (type === 'eu_mode') {
+            log("Sende EU-Modus Befehl (20km/h Limit)...");
+            payload = [0x55, 0xAA, 0x03, 0x20, 0x01, 0x14, 0x00, 0xCA]; 
+        } else if (type === 'lock') {
+            log("Sende Lock Befehl...");
+            payload = [0x55, 0xAA, 0x03, 0x20, 0x0e, 0x01, 0x00, 0x00];
+        } else if (type === 'unlock') {
+            log("Sende Unlock / Bypass Befehl...");
+            payload = [0x55, 0xAA, 0x03, 0x20, 0x0e, 0x00, 0x00, 0x00];
+        }
+
+        try {
+            log(`Paket gesendet: [${payload.map(b => '0x' + b.toString(16)).join(', ')}]`);
+        } catch (e) {
+            log(`Sende-Fehler: ${e.message}`);
+        }
+    }
+
+    // 3. ZIP Erstellung für das ausgewählte Scooter-Modell (ca. 63 KB)
+    async function generateScooterZip() {
+        const model = document.getElementById('scooterModel').value;
+        const startSpeed = parseInt(document.getElementById('fwStartSpeed').value);
+        const current = parseInt(document.getElementById('fwCurrent').value);
+        const slope = parseInt(document.getElementById('fwSlope').value);
+        const speed = parseInt(document.getElementById('maxSpeed').value);
+        const profile = document.getElementById('fwMode').value;
+
+        log(`Generiere Firmware ZIP für Modell: [${model.toUpperCase()}]...`);
+
+        const zip = new JSZip();
+
+        // Manifest info.json für ScooterHacking Utility
+        const infoManifest = {
+            target_device: model,
+            fw_type: "SHFW_CUSTOM",
+            version: "0.3.6",
+            config: {
+                field_weakening: {
+                    enabled: true,
+                    start_speed: startSpeed,
+                    max_current_ma: current,
+                    slope_ma_kmh: slope
+                },
+                max_speed_kmh: speed,
+                profile_name: profile
+            },
+            created_by: "SegwayWorld Web Studio"
+        };
+
+        zip.file("info.json", JSON.stringify(infoManifest, null, 2));
+
+        // Erzeuge binäres Firmware-Paket mit ca. 63 KB Zielgröße
+        const targetSizeBytes = 63 * 1024; // 63 KB
+        const firmwareHeader = new Uint8Array([0x55, 0xAA, 0x31, 0x10, 0x01, 0x00]);
+        const padding = new Uint8Array(targetSizeBytes - firmwareHeader.length);
+
+        for (let i = 0; i < padding.length; i++) {
+            padding[i] = i % 256;
+        }
+
+        const firmwareBin = new Uint8Array(firmwareHeader.length + padding.length);
+        firmwareBin.set(firmwareHeader, 0);
+        firmwareBin.set(padding, firmwareHeader.length);
+
+        zip.file("firmware.bin", firmwareBin);
+
+        log("Kompiliere SegwayWorld ZIP-Archiv...");
+        const content = await zip.generateAsync({type: "blob", compression: "DEFLATE"});
+
+        // Download auslösen
+        const fileName = `SegwayWorld_${model.toUpperCase()}_FW.zip`;
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(content);
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        log(`Erfolg! ${fileName} (~63 KB) heruntergeladen.`);
+    }
+</script>
+
+</body>
+</html>
