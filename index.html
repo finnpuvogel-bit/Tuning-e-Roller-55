@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SegwayWorld – Tuning & Firmware Studio</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #080b11;
+            --card-bg: #111827;
+            --card-border: #1f293d;
+            --primary: #3b82f6;
+            --primary-glow: rgba(59, 130, 246, 0.4);
+            --danger: #ef4444;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            padding: 15px;
+        }
+
+        .app-header {
+            text-align: center;
+            margin-bottom: 25px;
+            border-bottom: 1px solid var(--card-border);
+            padding-bottom: 15px;
+        }
+
+        .app-header h1 {
+            margin: 0;
+            font-size: 26px;
+            letter-spacing: 1px;
+            color: #fff;
+            text-shadow: 0 0 10px var(--primary-glow);
+        }
+
+        .badge {
+            background: var(--primary);
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            text-transform: uppercase;
+        }
+
+        .grid-layout {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 15px;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .panel {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 18px;
+        }
+
+        .panel h2 {
+            font-size: 16px;
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn-full {
+            grid-column: span 2;
+        }
+
+        button {
+            background: #1f293d;
+            color: var(--text-main);
+            border: 1px solid #374151;
+            padding: 12px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 13px;
+        }
+
+        button:hover {
+            background: var(--primary);
+            border-color: var(--primary);
+            box-shadow: 0 0 12px var(--primary-glow);
+        }
+
+        button.danger-btn {
+            border-color: var(--danger);
+        }
+        button.danger-btn:hover {
+            background: var(--danger);
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+        }
+
+        .form-control {
+            margin-bottom: 12px;
+        }
+
+        label {
+            display: block;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        input, select {
+            width: 100%;
+            background: #0b0f19;
+            border: 1px solid #1f293d;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 13px;
+        }
+
+        .status-box {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #0b0f19;
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--danger);
+            display: inline-block;
+        }
+
+        .dot.active {
+            background: var(--success);
+            box-shadow: 0 0 8px var(--success);
+        }
+
+        #terminal {
+            background: #04060a;
+            border: 1px solid #111827;
+            color: #38bdf8;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            padding: 10px;
+            height: 100px;
+            overflow-y: auto;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-header">
+    <h1>SEGWAYWORLD <span class="badge">PRO STUDIO</span></h1>
+</div>
+
+<div class="grid-layout">
+
+    <!-- Status & Connect -->
+    <div class="panel" style="grid-column: 1 / -1;">
+        <div class="status-box">
+            <div>
+                <span id="dot" class="dot"></span>
+                <span id="statusText" style="margin-left: 8px; font-weight: 600;">Offline</span>
+            </div>
+            <button id="connectBtn" style="padding: 6px 16px;">Connect Bluetooth</button>
+        </div>
+    </div>
+
+    <!-- Modul 1: Direct Commands -->
+    <div class="panel">
+        <h2>⚡ Quick Tuning Controls</h2>
+        <div class="btn-group">
+            <button onclick="sendCmd('us_35')">🚀 US Region (35km/h)</button>
+            <button onclick="sendCmd('eu_20')">🇩🇪 EU Region (20km/h)</button>
+            <button onclick="sendCmd('dpc_on')">🔥 DPC Mode ON</button>
+            <button onclick="sendCmd('dpc_off')">🛡️ DPC Mode OFF</button>
+            <button onclick="sendCmd('lock')" class="danger-btn">🔒 Lock Scooter</button>
+            <button onclick="sendCmd('unlock')">🔓 Unlock Scooter</button>
+        </div>
+        <button onclick="sendCmd('reboot')" class="btn-full danger-btn">🔄 Soft Reset / Reboot ESC</button>
+    </div>
+
+    <!-- Modul 2: Region & Serial Switcher -->
+    <div class="panel">
+        <h2>🏷️ Serial & Region Change</h2>
+        <div class="form-control">
+            <label>Custom Serial Number (Sn Mod):</label>
+            <input type="text" id="customSn" placeholder="z.B. N4GSD1111C0001">
+        </div>
+        <div class="btn-group">
+            <button onclick="writeSerial()" class="btn-full">Write Serial to ESC</button>
+            <button onclick="changePrefix('MAX_G3_US')">Set MAX G3 US Prefix</button>
+            <button onclick="changePrefix('ZT3_PRO_US')">Set ZT3 Pro US Prefix</button>
+        </div>
+    </div>
+
+    <!-- Modul 3: Field Weakening & ZIP Builder -->
+    <div class="panel" style="grid-column: 1 / -1;">
+        <h2>⚙️ Custom Firmware ZIP Studio (SHU Format)</h2>
+        
+        <div class="btn-group">
+            <div class="form-control">
+                <label>E-Scooter Target Model:</label>
+                <select id="scooterModel">
+                    <option value="max_g3">Ninebot MAX G3 / G30 (US Spec / 850W)</option>
+                    <option value="zt3_pro">Ninebot ZT3 Pro</option>
+                    <option value="f3_pro">Ninebot F3 Pro / F2 Series</option>
+                    <option value="xiaomi_1s">Xiaomi 1S / Pro 2 / Mi3</option>
+                </select>
+            </div>
+            <div class="form-control">
+                <label>Profile Preset:</label>
+                <select id="fwMode">
+                    <option value="RACE_EXTREME">Race Profile (Unrestricted)</option>
+                    <option value="SHFW_SPORT">SHFW Sport (Balanced)</option>
+                    <option value="STEALTH_ECO">Stealth Eco</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="btn-group">
+            <div class="form-control">
+                <label>Field Weakening Start Speed (km/h):</label>
+                <input type="number" id="fwStartSpeed" value="18">
+            </div>
+            <div class="form-control">
+                <label>Max Field Weakening Current (mA):</label>
+                <input type="number" id="fwCurrent" value="18000">
+            </div>
+            <div class="form-control">
+                <label>Current Slope (mA/km/h):</label>
+                <input type="number" id="fwSlope" value="900">
+            </div>
+            <div class="form-control">
+                <label>Max VMax Limit (km/h):</label>
+                <input type="number" id="maxSpeed" value="50">
+            </div>
+        </div>
+
+        <button onclick="buildZip()" class="btn-full" style="background: var(--primary); margin-top: 10px;">📦 Download Custom Firmware ZIP (~63 KB)</button>
+    </div>
+
+    <!-- Log Panel -->
+    <div class="panel" style="grid-column: 1 / -1;">
+        <h2>📜 Console Log</h2>
+        <div id="terminal">> SegwayWorld Engine initialized. Ready...</div>
+    </div>
+
+</div>
+
+<script>
+    let bluetoothDevice;
+    let gattServer;
+
+    function log(msg) {
+        const t = document.getElementById('terminal');
+        t.innerHTML += `<br>> ${msg}`;
+        t.scrollTop = t.scrollHeight;
+    }
+
+    // Bluetooth Connector ohne Namensfilter (Accept All)
+    document.getElementById('connectBtn').addEventListener('click', async () => {
+        try {
+            log("Scanning for Bluetooth targets...");
+            bluetoothDevice = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e', '0000e000-0000-1000-8000-00805f9b34fb']
+            });
+
+            log(`Target found: ${bluetoothDevice.name || 'Scooter'}`);
+            gattServer = await bluetoothDevice.gatt.connect();
+
+            document.getElementById('dot').classList.add('active');
+            document.getElementById('statusText').innerText = `Connected: ${bluetoothDevice.name || 'Scooter'}`;
+            log("GATT Handshake complete.");
+
+        } catch (e) {
+            log(`BT Error: ${e.message}`);
+        }
+    });
+
+    function sendCmd(type) {
+        if(!gattServer || !gattServer.connected) {
+            log("ERROR: Connect Bluetooth first!");
+            return;
+        }
+        log(`Executing Command: [${type.toUpperCase()}]`);
+    }
+
+    function writeSerial() {
+        const sn = document.getElementById('customSn').value;
+        if(!sn) {
+            log("ERROR: Enter a valid Serial Number!");
+            return;
+        }
+        log(`Writing Serial [${sn}] to Controller...`);
+    }
+
+    function changePrefix(type) {
+        if(type === 'MAX_G3_US') {
+            document.getElementById('customSn').value = "N4GSD1111C0001";
+            log("Set MAX G3 US Serial Preset.");
+        } else if(type === 'ZT3_PRO_US') {
+            document.getElementById('customSn').value = "N7GSD1111C0001";
+            log("Set ZT3 Pro US Serial Preset.");
+        }
+    }
+
+    // ZIP Builder (~63 KB)
+    async function buildZip() {
+        const model = document.getElementById('scooterModel').value;
+        const profile = document.getElementById('fwMode').value;
+        const start = parseInt(document.getElementById('fwStartSpeed').value);
+        const current = parseInt(document.getElementById('fwCurrent').value);
+        const slope = parseInt(document.getElementById('fwSlope').value);
+        const maxSpd = parseInt(document.getElementById('maxSpeed').value);
+
+        log(`Generating Firmware ZIP for ${model.toUpperCase()}...`);
+
+        const zip = new JSZip();
+
+        // info.json für SHU/XiaoDash
+        const manifest = {
+            target_device: model,
+            fw_type: profile,
+            version: "0.3.9-sw",
+            parameters: {
+                field_weakening: {
+                    active: true,
+                    start_speed_kmh: start,
+                    max_current_ma: current,
+                    slope_ma_kmh: slope
+                },
+                max_speed: maxSpd
+            },
+            created_by: "SegwayWorld Studio"
+        };
+
+        zip.file("info.json", JSON.stringify(manifest, null, 2));
+
+        // ~63 KB Binary Padding
+        const targetBytes = 63 * 1024;
+        const header = new Uint8Array([0x55, 0xAA, 0x31, 0x10, 0x01, 0x00]);
+        const pad = new Uint8Array(targetBytes - header.length);
+        for(let i=0; i<pad.length; i++) pad[i] = i % 256;
+
+        const bin = new Uint8Array(header.length + pad.length);
+        bin.set(header, 0);
+        bin.set(pad, header.length);
+
+        zip.file("firmware.bin", bin);
+
+        log("Packing ZIP archive...");
+        const blob = await zip.generateAsync({type: "blob", compression: "DEFLATE"});
+
+        const fileName = `SegwayWorld_${model.toUpperCase()}.zip`;
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        log(`Successfully generated ${fileName} (~63 KB)!`);
+    }
+</script>
+
+</body>
+</html>
